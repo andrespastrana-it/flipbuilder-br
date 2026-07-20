@@ -1,0 +1,6 @@
+{
+  "name": "FlipBuilder BR",
+  "description": "Custom PC builder tool for assembling and reselling gaming PCs in Brazil. Includes a parts catalog, cost/margin calculator, and ad copy generator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
