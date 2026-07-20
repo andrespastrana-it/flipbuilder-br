@@ -18,7 +18,7 @@ export const useBuild = () => useContext(BuildContext);
 
 export function BuildProvider({ children }: { children: ReactNode }) {
   const [currentBuild, setCurrentBuild] = useState<Partial<Build>>({
-    name: "Novo PC",
+    name: "New PC",
     status: "planejando",
     aestheticMultiplier: false,
     markupPercent: 20,

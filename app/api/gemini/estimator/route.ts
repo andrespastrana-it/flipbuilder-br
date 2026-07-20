@@ -12,9 +12,9 @@ export async function POST(req: Request) {
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: `Busque o preço de venda de computadores (PCs Gamers) similares montados com a placa de vídeo "${gpuName}" no Brasil. 
-Use a busca (Google Search) para encontrar cerca de 5 anúncios reais (ex: Mercado Livre, OLX, Facebook, etc).
-Resuma os anúncios encontrados e estime um preço justo de venda para a seguinte configuração: ${buildSummary}
+      contents: `Search for the sell price of similar pre-built gaming PCs with the graphics card "${gpuName}" in Brazil.
+Use Google Search to find about 5 real listings (e.g. Mercado Livre, OLX, Facebook, etc).
+Summarize the listings found and estimate a fair sell price for this configuration: ${buildSummary}
       `,
       config: {
         tools: [{ googleSearch: {} }],

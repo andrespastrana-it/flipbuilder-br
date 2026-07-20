@@ -72,7 +72,7 @@ export const seedParts: Part[] = [
   {
     id: "mobo-b550m",
     category: "motherboard",
-    name: "Placa Mãe B550M Aorus Elite",
+    name: "B550M Aorus Elite Motherboard",
     brand: "Gigabyte",
     socket: "AM4",
     ramType: "DDR4",
@@ -88,7 +88,7 @@ export const seedParts: Part[] = [
   {
     id: "mobo-b650m",
     category: "motherboard",
-    name: "Placa Mãe B650M TUF Gaming",
+    name: "B650M TUF Gaming Motherboard",
     brand: "ASUS",
     socket: "AM5",
     ramType: "DDR5",
@@ -104,7 +104,7 @@ export const seedParts: Part[] = [
   {
     id: "ram-ddr4-3200",
     category: "ram",
-    name: "Memória Kingston Fury Beast 16GB (2x8) DDR4 3200MHz",
+    name: "Kingston Fury Beast 16GB (2x8) DDR4 3200MHz Memory",
     brand: "Kingston",
     ramType: "DDR4",
     imageUrl: "https://picsum.photos/seed/ddr4-3200/200",
@@ -119,7 +119,7 @@ export const seedParts: Part[] = [
   {
     id: "ram-ddr5-6000",
     category: "ram",
-    name: "Memória Corsair Vengeance 32GB (2x16) DDR5 6000MHz",
+    name: "Corsair Vengeance 32GB (2x16) DDR5 6000MHz Memory",
     brand: "Corsair",
     ramType: "DDR5",
     imageUrl: "https://picsum.photos/seed/ddr5-6000/200",
@@ -207,7 +207,7 @@ export const seedParts: Part[] = [
   {
     id: "psu-650w",
     category: "psu",
-    name: "Fonte MSI MAG A650BN 650W Bronze",
+    name: "MSI MAG A650BN 650W Bronze PSU",
     brand: "MSI",
     wattage: 650,
     imageUrl: "https://picsum.photos/seed/650w/200",
@@ -222,7 +222,7 @@ export const seedParts: Part[] = [
   {
     id: "psu-750w",
     category: "psu",
-    name: "Fonte Corsair CX750M 750W Bronze",
+    name: "Corsair CX750M 750W Bronze PSU",
     brand: "Corsair",
     wattage: 750,
     imageUrl: "https://picsum.photos/seed/750w/200",
@@ -251,7 +251,7 @@ export const seedParts: Part[] = [
   {
     id: "case-white",
     category: "case",
-    name: "Gabinete Montech Air 903 Max White Mesh",
+    name: "Montech Air 903 Max White Mesh Case",
     brand: "Montech",
     imageUrl: "https://picsum.photos/seed/casewhite/200",
     priceMin: 350,
@@ -265,7 +265,7 @@ export const seedParts: Part[] = [
   {
     id: "fans-argb",
     category: "fans",
-    name: "Kit 3 Fans Aigo ARGB 120mm White",
+    name: "Aigo ARGB 120mm White Fan Kit (3)",
     brand: "Aigo",
     imageUrl: "https://picsum.photos/seed/fansargb/200",
     priceMin: 100,

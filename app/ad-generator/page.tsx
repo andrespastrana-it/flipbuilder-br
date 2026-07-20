@@ -1,17 +1,32 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useBuild } from '@/components/BuildProvider';
 import { getParts } from '@/lib/db';
 import { Part, Category } from '@/lib/types';
 import { Copy, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { PageHeader, PageShell } from '@/components/PageShell';
+
+const TABS = [
+  { id: 'agressivo' as const, label: 'Aggressive', hint: 'Quick sale' },
+  { id: 'premium' as const, label: 'Premium', hint: 'Quality' },
+  { id: 'direto' as const, label: 'Direct', hint: 'No fluff' },
+];
 
 export default function AdGeneratorPage() {
   const { currentBuild } = useBuild();
   const [parts, setParts] = useState<Part[]>([]);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [variants, setVariants] = useState<{agressivo: string, premium: string, direto: string} | null>(null);
-  const [activeTab, setActiveTab] = useState<'agressivo'|'premium'|'direto'>('agressivo');
+  const [variants, setVariants] = useState<{
+    agressivo: string;
+    premium: string;
+    direto: string;
+  } | null>(null);
+  const [activeTab, setActiveTab] = useState<'agressivo' | 'premium' | 'direto'>('agressivo');
 
   useEffect(() => {
     getParts().then(setParts);
@@ -20,12 +35,15 @@ export default function AdGeneratorPage() {
   const getPartName = (cat: Category) => {
     const buildPart = currentBuild.parts?.[cat];
     if (!buildPart) return null;
-    return parts.find(p => p.id === buildPart.partId)?.name;
+    return parts.find((p) => p.id === buildPart.partId)?.name;
   };
 
-  const getPartNameFallback = (cat: Category) => getPartName(cat) || '[Peça não selecionada]';
+  const getPartNameFallback = (cat: Category) => getPartName(cat) || '[Part not selected]';
 
-  const totalCostActual = Object.values(currentBuild.parts || {}).reduce((acc, p) => acc + (p?.actualPaid || 0), 0);
+  const totalCostActual = Object.values(currentBuild.parts || {}).reduce(
+    (acc, p) => acc + (p?.actualPaid || 0),
+    0
+  );
   const markup = (currentBuild.markupPercent || 20) / 100;
   let suggestedPrice = totalCostActual * (1 + markup);
   if (currentBuild.aestheticMultiplier) suggestedPrice *= 1.05;
@@ -33,22 +51,22 @@ export default function AdGeneratorPage() {
   const financedPrice = Math.round(finalPrice * 1.15);
   const parcela = Math.round(financedPrice / 12);
 
-  const gpuName = getPartName('gpu') || 'PC Gamer';
-  
+  const filledCount = Object.values(currentBuild.parts || {}).filter(Boolean).length;
+
   const buildSummary = `
 - CPU: ${getPartNameFallback('cpu')}
-- Placa Mãe: ${getPartNameFallback('motherboard')}
+- Motherboard: ${getPartNameFallback('motherboard')}
 - RAM: ${getPartNameFallback('ram')}
 - GPU: ${getPartNameFallback('gpu')}
 - SSD: ${getPartNameFallback('ssd')}
-- Fonte: ${getPartNameFallback('psu')}
+- PSU: ${getPartNameFallback('psu')}
 - Cooler: ${getPartNameFallback('cooler')}
-- Gabinete: ${getPartNameFallback('case')}
+- Case: ${getPartNameFallback('case')}
 - Fans/RGB: ${getPartNameFallback('fans')}
 
-Formas de pagamento:
-- À vista: R$ ${finalPrice}
-- 12x de R$ ${parcela}
+Payment options:
+- Cash: R$ ${finalPrice}
+- 12× of R$ ${parcela}
 `;
 
   const generateAds = async () => {
@@ -57,15 +75,13 @@ Formas de pagamento:
       const res = await fetch('/api/gemini/ad-generator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ build: buildSummary, price: finalPrice })
+        body: JSON.stringify({ build: buildSummary, price: finalPrice }),
       });
       const data = await res.json();
-      if (data) {
-        setVariants(data);
-      }
+      if (data) setVariants(data);
     } catch (e) {
       console.error(e);
-      alert('Erro ao gerar anúncios');
+      alert('Failed to generate ads');
     } finally {
       setLoading(false);
     }
@@ -79,49 +95,117 @@ Formas de pagamento:
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4 lg:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 space-y-4 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-zinc-100 flex items-center">
-          <Sparkles className="text-cyan-400 mr-3 w-8 h-8" />
-          Gerador de Anúncio IA
-        </h1>
-        <button 
-          onClick={generateAds}
-          disabled={loading}
-          className="flex items-center justify-center space-x-2 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold py-2 px-6 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-          <span>{loading ? 'Gerando...' : 'Gerar Anúncios'}</span>
-        </button>
-      </div>
-      
-      {!variants && !loading && (
-        <div className="text-center py-20 text-zinc-500 border border-zinc-800 border-dashed rounded-xl">
-          Clique no botão acima para gerar 3 opções de anúncios otimizados pela IA para o seu PC.
+    <PageShell narrow>
+      <PageHeader
+        eyebrow="Marketplace"
+        title="Ad generator"
+        action={
+          <button
+            onClick={generateAds}
+            disabled={loading || filledCount === 0}
+            type="button"
+            className="btn-primary flex items-center justify-center gap-2 py-3 px-5 text-[13px] shrink-0"
+          >
+            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {loading ? 'Generating…' : 'Generate 3 tones'}
+          </button>
+        }
+      />
+
+      <p className="text-[var(--steel)] text-sm -mt-6 mb-8">
+        {currentBuild.name || 'New PC'} · {filledCount}/9 parts · R${' '}
+        {finalPrice.toLocaleString('pt-BR')}
+      </p>
+
+      {filledCount === 0 && (
+        <div className="mb-8 py-4 border-y border-[var(--line)] text-sm text-[var(--ink-soft)]">
+          Assemble a build on the{' '}
+          <Link href="/" className="text-[var(--ink)] font-semibold underline underline-offset-2">
+            workbench
+          </Link>{' '}
+          before generating the ad.
         </div>
       )}
 
-      {variants && !loading && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
-          <div className="flex border-b border-zinc-800">
-            <button onClick={() => setActiveTab('agressivo')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'agressivo' ? 'bg-zinc-800 text-cyan-400 border-b-2 border-cyan-400' : 'text-zinc-400 hover:bg-zinc-800/50'}`}>🔥 Agressivo (Venda Rápida)</button>
-            <button onClick={() => setActiveTab('premium')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'premium' ? 'bg-zinc-800 text-emerald-400 border-b-2 border-emerald-400' : 'text-zinc-400 hover:bg-zinc-800/50'}`}>✨ Premium (Qualidade)</button>
-            <button onClick={() => setActiveTab('direto')} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'direto' ? 'bg-zinc-800 text-zinc-100 border-b-2 border-zinc-100' : 'text-zinc-400 hover:bg-zinc-800/50'}`}>⚡ Direto ao Ponto</button>
-          </div>
-          <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 flex justify-end">
-            <button 
-              onClick={handleCopy}
-              className="flex items-center space-x-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-medium py-2 px-4 rounded-md transition-colors text-sm"
-            >
-              {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-              <span>{copied ? 'Copiado!' : 'Copiar Texto'}</span>
-            </button>
-          </div>
-          <div className="p-6 bg-zinc-900 text-zinc-300 whitespace-pre-wrap font-sans text-sm leading-relaxed min-h-[300px]">
-            {variants[activeTab]}
-          </div>
-        </div>
-      )}
-    </div>
+      <AnimatePresence mode="wait">
+        {!variants && !loading && (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="py-24 text-center border border-dashed border-[var(--line)]"
+          >
+            <p className="text-[var(--steel)] max-w-sm mx-auto text-sm leading-relaxed">
+              Three listing tones for Mercado Livre and groups — aggressive, premium, and direct.
+            </p>
+          </motion.div>
+        )}
+
+        {loading && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center justify-center py-24 gap-3 text-[var(--steel)]"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--ink)] animate-pulse" />
+            <span className="font-display font-semibold tracking-wide text-sm">Writing ads…</span>
+          </motion.div>
+        )}
+
+        {variants && !loading && (
+          <motion.div
+            key="result"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="border border-[var(--line)] overflow-hidden"
+          >
+            <div className="grid grid-cols-3 border-b border-[var(--line)]">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'py-3.5 px-2 text-center transition-colors border-b-2 -mb-px',
+                    activeTab === tab.id
+                      ? 'border-[var(--ink)] text-[var(--ink)]'
+                      : 'border-transparent text-[var(--steel)] hover:text-[var(--ink)]'
+                  )}
+                >
+                  <span className="block font-display font-bold text-sm">{tab.label}</span>
+                  <span className="block text-[10px] opacity-60 mt-0.5 hidden sm:block">
+                    {tab.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="px-4 py-3 border-b border-[var(--line)] flex justify-between items-center">
+              <span className="font-mono-num text-[10px] tracking-[0.18em] uppercase text-[var(--steel-dim)]">
+                Ready to paste
+              </span>
+              <button
+                onClick={handleCopy}
+                type="button"
+                className={cn(
+                  'flex items-center gap-2 font-display font-bold text-[13px] py-2 px-4 transition-all',
+                  copied ? 'btn-primary' : 'btn-ghost text-[var(--ink)]'
+                )}
+              >
+                {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 text-[var(--ink-soft)] whitespace-pre-wrap text-sm leading-relaxed min-h-[280px]">
+              {variants[activeTab]}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </PageShell>
   );
 }

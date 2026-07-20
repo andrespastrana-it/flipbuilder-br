@@ -12,9 +12,9 @@ export async function POST(req: Request) {
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: `Encontre o menor preço atualizado para a peça de computador: "${partName}". 
-Busque EXCLUSIVAMENTE nestes sites: site:kabum.com.br OR site:terabyteshop.com.br OR site:pichau.com.br OR site:mercadolivre.com.br
-Retorne os 4 resultados mais baratos que você encontrar.`,
+      contents: `Find the lowest current price for this PC part: "${partName}".
+Search EXCLUSIVELY on these sites: site:kabum.com.br OR site:terabyteshop.com.br OR site:pichau.com.br OR site:mercadolivre.com.br
+Return the 4 cheapest results you find.`,
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -26,10 +26,10 @@ Retorne os 4 resultados mais baratos que você encontrar.`,
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  store: { type: Type.STRING, description: "Nome da loja em minúsculas (ex: kabum, terabyte, pichau, mercadolivre)" },
-                  price: { type: Type.NUMBER, description: "Preço em Reais (BRL) - use formato numérico, ex: 1599.99" },
-                  url: { type: Type.STRING, description: "URL direta do produto" },
-                  inStock: { type: Type.BOOLEAN, description: "Se está em estoque" },
+                  store: { type: Type.STRING, description: "Store name in lowercase (e.g. kabum, terabyte, pichau, mercadolivre)" },
+                  price: { type: Type.NUMBER, description: "Price in BRL — numeric format, e.g. 1599.99" },
+                  url: { type: Type.STRING, description: "Direct product URL" },
+                  inStock: { type: Type.BOOLEAN, description: "Whether it is in stock" },
                 },
                 required: ["store", "price", "url", "inStock"]
               }

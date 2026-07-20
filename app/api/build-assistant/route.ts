@@ -11,41 +11,41 @@ export async function POST(req: Request) {
     const { prompt, history, catalog } = await req.json();
 
     const systemInstruction = `
-Você é um assistente de montagem de PCs Gamer no Brasil, ajudando lojistas a planejar setups.
-Você tem acesso ao seguinte catálogo de peças:
+You are a gaming PC build assistant for Brazil, helping resellers plan setups.
+You have access to this parts catalog:
 ${JSON.stringify(catalog)}
 
-REGRAS DE COMPATIBILIDADE (Siga estritamente):
-1. Processadores AM4 (ex: Ryzen 5000) precisam de placa mãe AM4 e memória DDR4.
-2. Processadores AM5 (ex: Ryzen 7000) precisam de placa mãe AM5 e memória DDR5.
-3. A fonte (PSU) deve suportar a placa de vídeo.
-4. O gabinete deve comportar a placa de vídeo.
+COMPATIBILITY RULES (follow strictly):
+1. AM4 processors (e.g. Ryzen 5000) need an AM4 motherboard and DDR4 memory.
+2. AM5 processors (e.g. Ryzen 7000) need an AM5 motherboard and DDR5 memory.
+3. The PSU must support the graphics card.
+4. The case must fit the graphics card.
 
-Dê uma resposta natural, em português, analisando a solicitação do usuário e sugerindo peças baseadas no catálogo.
-Se você sugerir uma build completa, preencha o campo "proposedBuild" no JSON de resposta. Use os IDs corretos do catálogo.
+Reply naturally in English, analyzing the user's request and suggesting parts from the catalog.
+If you suggest a full build, fill the "proposedBuild" field in the JSON response. Use correct catalog IDs.
 
-Formato de resposta OBRIGATÓRIO (JSON):
+REQUIRED response format (JSON):
 {
-  "response": "Sua resposta explicativa e conversacional aqui",
+  "response": "Your explanatory conversational reply here",
   "proposedBuild": {
-    "cpu": "id-do-cpu",
-    "motherboard": "id-da-placa",
-    "ram": "id-da-ram",
-    "gpu": "id-da-gpu",
-    "ssd": "id-do-ssd",
-    "psu": "id-da-psu",
-    "cooler": "id-do-cooler",
-    "case": "id-do-case",
-    "fans": "id-dos-fans"
-  } // proposedBuild pode ser nulo se for apenas uma conversa sem uma build inteira
+    "cpu": "cpu-id",
+    "motherboard": "mobo-id",
+    "ram": "ram-id",
+    "gpu": "gpu-id",
+    "ssd": "ssd-id",
+    "psu": "psu-id",
+    "cooler": "cooler-id",
+    "case": "case-id",
+    "fans": "fans-id"
+  } // proposedBuild may be null if this is just conversation without a full build
 }
 `;
 
-    let conversationContext = "Histórico da conversa:\n";
+    let conversationContext = "Conversation history:\n";
     for (const msg of history) {
-      conversationContext += `${msg.role === 'user' ? 'Usuário' : 'Assistente'}: ${msg.text}\n`;
+      conversationContext += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text}\n`;
     }
-    conversationContext += `\nUsuário: ${prompt}`;
+    conversationContext += `\nUser: ${prompt}`;
 
     const res = await ai.models.generateContent({
       model: "gemini-3.5-flash",

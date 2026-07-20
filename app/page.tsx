@@ -1,49 +1,86 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getParts, saveBuild } from '@/lib/db';
 import { Part, Category, BuildPart, Build } from '@/lib/types';
 import { useBuild } from '@/components/BuildProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { Search, Plus, X, MonitorPlay, Save, ExternalLink, RefreshCw } from 'lucide-react';
+import {
+  Search,
+  X,
+  Save,
+  RefreshCw,
+  Cpu,
+  CircuitBoard,
+  MemoryStick,
+  Monitor,
+  HardDrive,
+  Zap,
+  Fan,
+  Box,
+  Wind,
+  Sparkles,
+} from 'lucide-react';
 import Image from 'next/image';
-
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/lib/utils';
 import { BuildAssistant } from '@/components/BuildAssistant';
 import { PartCard } from '@/components/PartCard';
+import { LoadingState, PageShell } from '@/components/PageShell';
 
-const CATEGORIES: { id: Category; label: string }[] = [
-  { id: 'cpu', label: 'Processador (CPU)' },
-  { id: 'motherboard', label: 'Placa Mãe' },
-  { id: 'ram', label: 'Memória RAM' },
-  { id: 'gpu', label: 'Placa de Vídeo (GPU)' },
-  { id: 'ssd', label: 'Armazenamento (SSD)' },
-  { id: 'psu', label: 'Fonte de Alimentação' },
-  { id: 'cooler', label: 'CPU Cooler' },
-  { id: 'case', label: 'Gabinete' },
-  { id: 'fans', label: 'Kit de Ventoinhas / ARGB' },
+const CATEGORIES: {
+  id: Category;
+  label: string;
+  short: string;
+  icon: typeof Cpu;
+}[] = [
+  { id: 'cpu', label: 'Processor', short: 'CPU', icon: Cpu },
+  { id: 'motherboard', label: 'Motherboard', short: 'MOBO', icon: CircuitBoard },
+  { id: 'ram', label: 'Memory (RAM)', short: 'RAM', icon: MemoryStick },
+  { id: 'gpu', label: 'Graphics card', short: 'GPU', icon: Monitor },
+  { id: 'ssd', label: 'Storage', short: 'SSD', icon: HardDrive },
+  { id: 'psu', label: 'Power supply', short: 'PSU', icon: Zap },
+  { id: 'cooler', label: 'CPU cooler', short: 'COOL', icon: Fan },
+  { id: 'case', label: 'Case', short: 'CASE', icon: Box },
+  { id: 'fans', label: 'Fans / ARGB', short: 'FANS', icon: Wind },
 ];
+
+function formatBRL(n: number) {
+  return n.toLocaleString('pt-BR');
+}
 
 export default function PCBuilderPage() {
   const { user } = useAuth();
   const { currentBuild, updatePart, setCurrentBuild } = useBuild();
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
-  
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
+  const [isEstimating, setIsEstimating] = useState(false);
+  const [estimatorResult, setEstimatorResult] = useState<{
+    suggestedSellPrice?: number;
+    comparables?: { title: string; url: string; price: number }[];
+  } | null>(null);
+  const [saveFlash, setSaveFlash] = useState(false);
 
   useEffect(() => {
-    getParts().then(data => {
+    getParts().then((data) => {
       setParts(data);
       setLoading(false);
     });
   }, []);
 
+  const filledCount = useMemo(
+    () => CATEGORIES.filter((c) => currentBuild.parts?.[c.id]).length,
+    [currentBuild.parts]
+  );
+
   const totalCostAvg = CATEGORIES.reduce((acc, cat) => {
     const buildPart = currentBuild.parts?.[cat.id];
     if (buildPart) {
-      const part = parts.find(p => p.id === buildPart.partId);
+      const part = parts.find((p) => p.id === buildPart.partId);
       return acc + (part?.priceAvg || 0);
     }
     return acc;
@@ -56,9 +93,7 @@ export default function PCBuilderPage() {
 
   const markup = (currentBuild.markupPercent || 20) / 100;
   let suggestedPrice = totalCostActual * (1 + markup);
-  if (currentBuild.aestheticMultiplier) {
-    suggestedPrice = suggestedPrice * 1.05;
-  }
+  if (currentBuild.aestheticMultiplier) suggestedPrice *= 1.05;
 
   const roundToPsychological = (val: number) => {
     const rounded = Math.round(val / 10) * 10;
@@ -66,6 +101,7 @@ export default function PCBuilderPage() {
   };
   const finalPrice = roundToPsychological(suggestedPrice);
   const profit = finalPrice - totalCostActual;
+  const marginPct = totalCostActual > 0 ? Math.round((profit / finalPrice) * 100) : 0;
 
   const handleSelectPart = (part: Part) => {
     if (activeCategory) {
@@ -81,90 +117,87 @@ export default function PCBuilderPage() {
 
   const handleActualPriceChange = (category: Category, price: number) => {
     const p = currentBuild.parts?.[category];
-    if (p) {
-      updatePart(category, { ...p, actualPaid: price });
-    }
+    if (p) updatePart(category, { ...p, actualPaid: price });
   };
 
-  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
-  const [isEstimating, setIsEstimating] = useState(false);
-  const [estimatorResult, setEstimatorResult] = useState<any>(null);
-
   const handleUpdateAllPrices = async () => {
-    const partIdsToUpdate = Object.values(currentBuild.parts || {}).filter(Boolean).map(bp => bp!.partId);
+    const partIdsToUpdate = Object.values(currentBuild.parts || {})
+      .filter(Boolean)
+      .map((bp) => bp!.partId);
     if (partIdsToUpdate.length === 0) return;
 
     setIsUpdatingPrices(true);
     let updatedCount = 0;
-    
+
     for (const partId of partIdsToUpdate) {
-      const part = parts.find(p => p.id === partId);
+      const part = parts.find((p) => p.id === partId);
       if (!part) continue;
-      
+
       try {
         const res = await fetch('/api/gemini/price-search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ partName: part.name })
+          body: JSON.stringify({ partName: part.name }),
         });
         const data = await res.json();
-        
+
         if (data.results && data.results.length > 0) {
-          const prices = data.results.map((r: any) => r.price).sort((a: number, b: number) => a - b);
+          const prices = data.results
+            .map((r: { price: number }) => r.price)
+            .sort((a: number, b: number) => a - b);
           const priceMin = prices[0];
           const priceAvg = Math.round(prices.reduce((a: number, b: number) => a + b, 0) / prices.length);
           const priceMax = prices[prices.length - 1];
 
-          setParts(prev => prev.map(p => {
-            if (p.id === partId) {
-              return { ...p, priceMin, priceAvg, priceMax, lastUpdated: Date.now() };
-            }
-            return p;
-          }));
-          
+          setParts((prev) =>
+            prev.map((p) =>
+              p.id === partId ? { ...p, priceMin, priceAvg, priceMax, lastUpdated: Date.now() } : p
+            )
+          );
           updatedCount++;
         }
-      } catch (e) {
-        console.error("Erro ao atualizar", part.name);
+      } catch {
+        console.error('Failed to update', part.name);
       }
     }
-    
+
     setIsUpdatingPrices(false);
-    alert(`Preços atualizados para ${updatedCount} peça(s)!`);
+    alert(`Prices updated for ${updatedCount} part(s)!`);
   };
 
   const handleEstimatePrice = async () => {
-    const gpuPart = currentBuild.parts?.gpu ? parts.find(p => p.id === currentBuild.parts!.gpu!.partId) : null;
+    const gpuPart = currentBuild.parts?.gpu
+      ? parts.find((p) => p.id === currentBuild.parts!.gpu!.partId)
+      : null;
     if (!gpuPart) {
-      alert("Selecione uma Placa de Vídeo primeiro!");
+      alert('Select a graphics card first!');
       return;
     }
-    const buildSummary = CATEGORIES.map(c => {
+    const buildSummary = CATEGORIES.map((c) => {
       const p = currentBuild.parts?.[c.id];
-      if (p) {
-        const part = parts.find(x => x.id === p.partId);
-        return part?.name || '';
-      }
+      if (p) return parts.find((x) => x.id === p.partId)?.name || '';
       return '';
-    }).filter(Boolean).join(", ");
+    })
+      .filter(Boolean)
+      .join(', ');
 
     setIsEstimating(true);
     try {
       const res = await fetch('/api/gemini/estimator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gpuName: gpuPart.name, buildSummary })
+        body: JSON.stringify({ gpuName: gpuPart.name, buildSummary }),
       });
       const data = await res.json();
       setEstimatorResult(data);
       if (data.suggestedSellPrice && totalCostActual > 0) {
-        let suggestedMarkup = ((data.suggestedSellPrice / totalCostActual) - 1) * 100;
+        let suggestedMarkup = (data.suggestedSellPrice / totalCostActual - 1) * 100;
         if (currentBuild.aestheticMultiplier) suggestedMarkup -= 5;
         setCurrentBuild({ ...currentBuild, markupPercent: Math.round(suggestedMarkup) });
       }
     } catch (e) {
       console.error(e);
-      alert("Erro ao estimar preço.");
+      alert('Failed to estimate price.');
     } finally {
       setIsEstimating(false);
     }
@@ -176,8 +209,10 @@ export default function PCBuilderPage() {
     try {
       const buildToSave: Build = {
         id: currentBuild.id || `build-${Date.now()}`,
-        name: currentBuild.name || "Novo PC",
-        thumbnail: currentBuild.parts?.case ? parts.find(p => p.id === currentBuild.parts!.case!.partId)?.imageUrl || '' : '',
+        name: currentBuild.name || 'New PC',
+        thumbnail: currentBuild.parts?.case
+          ? parts.find((p) => p.id === currentBuild.parts!.case!.partId)?.imageUrl || ''
+          : '',
         totalCost: totalCostActual,
         targetSellPrice: finalPrice,
         status: currentBuild.status || 'planejando',
@@ -189,243 +224,381 @@ export default function PCBuilderPage() {
       };
       await saveBuild(buildToSave);
       setCurrentBuild(buildToSave);
-      alert('Setup salvo com sucesso!');
+      setSaveFlash(true);
+      setTimeout(() => setSaveFlash(false), 2000);
     } catch (e) {
       console.error(e);
-      alert('Erro ao salvar setup.');
+      alert('Failed to save build.');
     } finally {
       setIsSaving(false);
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-cyan-400">Carregando peças...</div>;
+    return <LoadingState label="Loading workbench…" />;
   }
 
+  const markupPercent = currentBuild.markupPercent || 20;
+
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 relative items-start">
-      <div className="lg:col-span-2 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
-          <div className="flex items-center space-x-3">
-            <MonitorPlay className="w-6 h-6 text-cyan-400" />
-            <input 
-              type="text" 
-              value={currentBuild.name || ''} 
-              onChange={e => setCurrentBuild({ ...currentBuild, name: e.target.value })}
-              className="bg-transparent border-b border-zinc-700 text-2xl font-bold text-zinc-100 focus:outline-none focus:border-cyan-500 pb-1 w-full max-w-xs transition-colors"
-              placeholder="Nome do Setup"
+    <PageShell>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10 lg:mb-12">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono-num text-[10px] tracking-[0.28em] uppercase text-[var(--steel)] mb-3">
+            Workbench · {filledCount}/9
+          </p>
+          <input
+            type="text"
+            value={currentBuild.name || ''}
+            onChange={(e) => setCurrentBuild({ ...currentBuild, name: e.target.value })}
+            className="bg-transparent border-0 font-display text-[clamp(2rem,4.5vw,3rem)] font-extrabold tracking-[-0.045em] text-[var(--ink)] focus:outline-none w-full max-w-lg placeholder:text-[var(--steel-dim)]"
+            placeholder="Build name"
+          />
+          <div className="mt-4 h-px w-full max-w-sm bg-[var(--line)] overflow-hidden">
+            <motion.div
+              className="h-full bg-[var(--ink)]"
+              initial={false}
+              animate={{ width: `${(filledCount / 9) * 100}%` }}
+              transition={{ type: 'spring', stiffness: 140, damping: 22 }}
             />
-          </div>
-          <div className="flex items-center space-x-2">
-            <button 
-              onClick={handleUpdateAllPrices}
-              disabled={isUpdatingPrices}
-              className="flex items-center justify-center space-x-2 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 px-4 py-2 rounded-lg transition-colors font-medium text-sm"
-            >
-              <RefreshCw className={`w-4 h-4 ${isUpdatingPrices ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isUpdatingPrices ? 'Atualizando...' : 'Atualizar Preços'}</span>
-            </button>
-            <button 
-              onClick={handleSaveBuild}
-              disabled={isSaving}
-              className="flex items-center justify-center space-x-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2 rounded-lg transition-colors font-medium text-sm"
-            >
-              <Save className="w-4 h-4" />
-              <span className="hidden sm:inline">{isSaving ? 'Salvando...' : 'Salvar Setup'}</span>
-            </button>
           </div>
         </div>
 
-        {CATEGORIES.map(category => {
-          const buildPart = currentBuild.parts?.[category.id];
-          const part = buildPart ? parts.find(p => p.id === buildPart.partId) : null;
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleUpdateAllPrices}
+            disabled={isUpdatingPrices || filledCount === 0}
+            type="button"
+            className="btn-ghost flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium disabled:opacity-40"
+          >
+            <RefreshCw className={cn('w-3.5 h-3.5', isUpdatingPrices && 'animate-spin')} />
+            <span className="hidden sm:inline">{isUpdatingPrices ? 'Updating…' : 'Refresh'}</span>
+          </button>
+          <button
+            onClick={handleSaveBuild}
+            disabled={isSaving}
+            type="button"
+            className="btn-primary flex items-center gap-2 px-5 py-2.5 text-[13px]"
+          >
+            <Save className="w-3.5 h-3.5" />
+            {saveFlash ? 'Saved' : isSaving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
 
-          return (
-            <div key={category.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between transition-colors hover:border-zinc-700">
-              <div className="flex items-center space-x-4 flex-1">
-                <div className="w-16 h-16 bg-zinc-950 border border-zinc-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start">
+        <div className="lg:col-span-7 xl:col-span-8">
+          {CATEGORIES.map((category, i) => {
+            const buildPart = currentBuild.parts?.[category.id];
+            const part = buildPart ? parts.find((p) => p.id === buildPart.partId) : null;
+            const Icon = category.icon;
+
+            return (
+              <motion.div
+                key={category.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.02, duration: 0.35 }}
+                className="slot-row group px-1 sm:px-2"
+              >
+                <div
+                  className={cn(
+                    'w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center overflow-hidden shrink-0',
+                    part ? 'bg-[var(--bg-elevated)]' : 'bg-[var(--bg-elevated)]/60'
+                  )}
+                >
                   {part ? (
-                    <Image src={part.imageUrl} alt={part.name} width={64} height={64} className="object-cover w-full h-full" unoptimized />
+                    <Image
+                      src={part.imageUrl}
+                      alt={part.name}
+                      width={56}
+                      height={56}
+                      className="object-cover w-full h-full animate-slot grayscale-[15%]"
+                      unoptimized
+                    />
                   ) : (
-                    <div className="text-xs text-zinc-600 font-medium tracking-wider uppercase text-center">{category.id}</div>
+                    <Icon className="w-4 h-4 text-[var(--steel-dim)]" strokeWidth={1.5} />
                   )}
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-zinc-400">{category.label}</h3>
+
+                <div className="flex-1 min-w-0">
+                  <span className="font-mono-num text-[10px] tracking-[0.16em] uppercase text-[var(--steel-dim)]">
+                    {category.short}
+                  </span>
                   {part ? (
-                    <div className="mt-1">
-                      <div className="text-zinc-100 font-semibold">{part.name}</div>
-                      <div className="text-xs text-zinc-500 mt-1 flex space-x-2">
-                        <span>Min: R$ {part.priceMin}</span>
-                        <span>Média: R$ {part.priceAvg}</span>
+                    <div className="mt-0.5">
+                      <div className="text-[var(--ink)] font-medium text-sm sm:text-[15px] truncate tracking-tight">
+                        {part.name}
+                      </div>
+                      <div className="font-mono-num text-[11px] text-[var(--steel)] mt-0.5">
+                        R$ {formatBRL(part.priceMin)} – {formatBRL(part.priceMax)}
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-1 text-zinc-600 text-sm">Nenhuma peça selecionada</div>
+                    <div className="mt-0.5 text-sm text-[var(--steel-dim)]">Empty</div>
                   )}
                 </div>
-              </div>
-              
-              <div className="flex items-center space-x-4 shrink-0">
-                {part ? (
-                  <>
-                    <div className="text-right hidden sm:block">
-                      <div className="text-xs text-zinc-400 mb-1">Preço Pago (R$)</div>
-                      <input 
-                        type="number"
-                        value={buildPart?.actualPaid || 0}
-                        onChange={(e) => handleActualPriceChange(category.id, Number(e.target.value))}
-                        className="bg-zinc-950 border border-zinc-800 text-zinc-100 px-3 py-1.5 rounded-md w-28 text-right text-sm focus:outline-none focus:border-cyan-500"
-                      />
-                    </div>
-                    <button 
-                      onClick={() => handleRemovePart(category.id)}
-                      className="p-2 text-zinc-500 hover:text-red-400 transition-colors"
-                      title="Remover"
+
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  {part ? (
+                    <>
+                      <div className="hidden sm:block text-right">
+                        <label className="block font-mono-num text-[9px] tracking-[0.14em] uppercase text-[var(--steel-dim)] mb-1">
+                          Paid
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--steel-dim)] font-mono-num">
+                            R$
+                          </span>
+                          <input
+                            type="number"
+                            value={buildPart?.actualPaid || 0}
+                            onChange={(e) =>
+                              handleActualPriceChange(category.id, Number(e.target.value))
+                            }
+                            className="bg-transparent border border-[var(--line)] text-[var(--ink)] font-mono-num pl-7 pr-2 py-1.5 w-[6.25rem] text-right text-sm focus:outline-none focus:border-[var(--ink)]"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setActiveCategory(category.id)}
+                        type="button"
+                        className="hidden sm:flex text-[12px] font-medium text-[var(--steel)] hover:text-[var(--ink)] transition-colors"
+                      >
+                        Swap
+                      </button>
+                      <button
+                        onClick={() => handleRemovePart(category.id)}
+                        type="button"
+                        className="p-1.5 text-[var(--steel-dim)] hover:text-[var(--ink)] transition-colors"
+                        title="Remove"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setActiveCategory(category.id)}
+                      type="button"
+                      className="font-display font-bold text-[13px] text-[var(--ink)] underline underline-offset-4 decoration-[var(--line)] hover:decoration-[var(--ink)] transition-colors"
                     >
-                      <X className="w-5 h-5" />
+                      Choose
                     </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setActiveCategory(category.id)}
-                    className="flex items-center space-x-2 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 px-4 py-2 rounded-lg transition-colors font-medium text-sm"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Escolher</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Right Column: Calculator Sidebar */}
-      <div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <h2 className="text-lg font-bold text-zinc-100 mb-6">Custos e Margem</h2>
-          
-          <div className="space-y-4 mb-6">
-            <div className="flex justify-between items-center">
-              <span className="text-zinc-400">Custo Total (Média)</span>
-              <span className="text-zinc-300 font-mono">R$ {totalCostAvg.toLocaleString('pt-BR')}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-zinc-400">Custo Total (Real)</span>
-              <span className="text-zinc-100 font-bold font-mono text-lg">R$ {totalCostActual.toLocaleString('pt-BR')}</span>
-            </div>
-          </div>
-
-          <div className="border-t border-zinc-800 pt-6 space-y-6">
-            <div>
-              <label className="flex items-center justify-between text-sm text-zinc-400 mb-2">
-                Markup (%)
-                <span className="text-cyan-400 font-mono">{currentBuild.markupPercent}%</span>
-              </label>
-              <input 
-                type="range" 
-                min="5" max="50" step="5"
-                value={currentBuild.markupPercent || 20}
-                onChange={(e) => setCurrentBuild({ ...currentBuild, markupPercent: Number(e.target.value) })}
-                className="w-full accent-cyan-500"
-              />
-            </div>
-
-            <label className="flex items-center space-x-3 text-sm text-zinc-300 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={currentBuild.aestheticMultiplier || false}
-                onChange={(e) => setCurrentBuild({ ...currentBuild, aestheticMultiplier: e.target.checked })}
-                className="w-4 h-4 rounded border-zinc-700 text-cyan-500 focus:ring-cyan-500/20 bg-zinc-950"
-              />
-              <span>Build estética (+5% valor agregado)</span>
-            </label>
-
-            <div className="bg-zinc-950 rounded-lg p-4 border border-zinc-800">
-              <div className="text-sm text-zinc-400 mb-1">Preço Sugerido (À Vista)</div>
-              <div className="text-3xl font-bold text-cyan-400 font-mono mb-2">
-                R$ {finalPrice.toLocaleString('pt-BR')}
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-zinc-500">Lucro Líquido:</span>
-                <span className="text-emerald-400 font-medium">R$ {profit.toLocaleString('pt-BR')}</span>
-              </div>
-            </div>
-            
-            <div className="bg-zinc-950 rounded-lg p-4 border border-zinc-800 text-sm">
-              <div className="text-zinc-400 mb-2 font-medium">Simulação Parcelado (12x)</div>
-              <div className="flex justify-between mb-1">
-                <span className="text-zinc-500">Valor Total:</span>
-                <span className="text-zinc-300">R$ {Math.round(finalPrice * 1.15).toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-500">Parcelas:</span>
-                <span className="text-zinc-300">12x R$ {Math.round((finalPrice * 1.15)/12).toLocaleString('pt-BR')}</span>
-              </div>
-            </div>
-            
-            <button 
-              onClick={handleEstimatePrice}
-              disabled={isEstimating}
-              className="w-full mt-4 bg-cyan-600 hover:bg-cyan-500 text-zinc-50 font-bold py-2 px-4 rounded-lg transition-colors flex justify-center items-center"
-            >
-              {isEstimating ? <RefreshCw className="w-5 h-5 animate-spin mr-2" /> : <Search className="w-5 h-5 mr-2" />}
-              Estimar preço de venda na IA
-            </button>
-            
-            {estimatorResult && (
-              <div className="mt-4 bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-lg">
-                <h3 className="text-emerald-400 font-bold mb-2">IA sugere: R$ {estimatorResult.suggestedSellPrice?.toLocaleString('pt-BR')}</h3>
-                <p className="text-zinc-400 text-xs mb-2">Com base em anúncios similares:</p>
-                <ul className="text-xs text-zinc-300 space-y-2">
-                  {estimatorResult.comparables?.map((c: any, i: number) => (
-                    <li key={i}><a href={c.url} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">{c.title}</a> - R$ {c.price}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
-        <BuildAssistant />
-      </div>
 
-      {/* Part Picker Modal */}
-      {activeCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/50">
-              <h2 className="text-lg font-bold text-zinc-100">Escolher {CATEGORIES.find(c => c.id === activeCategory)?.label}</h2>
-              <button onClick={() => setActiveCategory(null)} className="p-2 text-zinc-400 hover:text-zinc-100 rounded-md transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+        <aside className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-20 space-y-6">
+          <div className="border border-[var(--line)] p-6 animate-rise">
+            <h2 className="font-mono-num text-[10px] tracking-[0.22em] uppercase text-[var(--steel)] mb-6">
+              Margin
+            </h2>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-baseline text-sm">
+                <span className="text-[var(--steel)]">Catalog avg</span>
+                <span className="font-mono-num text-[var(--ink-soft)]">R$ {formatBRL(totalCostAvg)}</span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                <span className="text-[var(--steel)] text-sm">Actual</span>
+                <span className="font-mono-num font-medium text-lg text-[var(--ink)]">
+                  R$ {formatBRL(totalCostActual)}
+                </span>
+              </div>
             </div>
-            <div className="p-4 border-b border-zinc-800 bg-zinc-900">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar peças..." 
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-3 text-zinc-100 focus:outline-none focus:border-cyan-500 transition-colors"
+
+            <div className="border-t border-[var(--line)] pt-6 space-y-6">
+              <div>
+                <div className="flex items-center justify-between text-sm mb-3">
+                  <span className="text-[var(--steel)]">Markup</span>
+                  <span className="font-mono-num text-[var(--ink)] font-medium">{markupPercent}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={5}
+                  max={50}
+                  step={5}
+                  value={markupPercent}
+                  onChange={(e) =>
+                    setCurrentBuild({ ...currentBuild, markupPercent: Number(e.target.value) })
+                  }
+                  className="markup-slider"
+                  style={{ ['--progress' as string]: `${((markupPercent - 5) / 45) * 100}%` }}
                 />
               </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {parts
-                .filter(p => p.category === activeCategory)
-                .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.brand.toLowerCase().includes(searchQuery.toLowerCase()))
-                .map(part => (
-                  <PartCard key={part.id} part={part} onSelect={handleSelectPart} />
-              ))}
-              {parts.filter(p => p.category === activeCategory).length === 0 && (
-                <div className="text-center text-zinc-500 py-8">Nenhuma peça cadastrada nesta categoria.</div>
-              )}
+
+              <label className="flex items-start gap-3 text-sm text-[var(--ink-soft)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={currentBuild.aestheticMultiplier || false}
+                  onChange={(e) =>
+                    setCurrentBuild({ ...currentBuild, aestheticMultiplier: e.target.checked })
+                  }
+                  className="mt-0.5 w-4 h-4 accent-[var(--ink)]"
+                />
+                <span>
+                  <span className="text-[var(--ink)]">Aesthetic build</span>
+                  <span className="block text-xs text-[var(--steel-dim)] mt-0.5">+5% for RGB / looks</span>
+                </span>
+              </label>
+
+              <div className="pt-1">
+                <div className="font-mono-num text-[10px] tracking-[0.18em] uppercase text-[var(--steel)] mb-2">
+                  Cash price
+                </div>
+                <div className="font-display text-[clamp(2.25rem,4vw,2.75rem)] font-extrabold tracking-[-0.04em] text-[var(--ink)] leading-none">
+                  R$ {formatBRL(finalPrice)}
+                </div>
+                <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--line)] text-sm">
+                  <span className="text-[var(--steel)]">Profit · {marginPct}%</span>
+                  <span className="font-mono-num font-medium text-[var(--ink)]">
+                    R$ {formatBRL(profit)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-sm space-y-1.5">
+                <div className="font-mono-num text-[10px] tracking-[0.16em] uppercase text-[var(--steel-dim)] mb-2">
+                  12× (+15%)
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--steel)]">Total</span>
+                  <span className="font-mono-num text-[var(--ink-soft)]">
+                    R$ {formatBRL(Math.round(finalPrice * 1.15))}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--steel)]">Monthly</span>
+                  <span className="font-mono-num text-[var(--ink)]">
+                    12× R$ {formatBRL(Math.round((finalPrice * 1.15) / 12))}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleEstimatePrice}
+                disabled={isEstimating}
+                type="button"
+                className="btn-ghost w-full flex items-center justify-center gap-2 font-display font-bold text-[13px] py-3 disabled:opacity-50"
+              >
+                {isEstimating ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                Estimate market price
+              </button>
+
+              <AnimatePresence>
+                {estimatorResult && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="border border-[var(--line)] p-4">
+                      <h3 className="font-display font-bold text-[var(--ink)] mb-1">
+                        AI · R$ {formatBRL(estimatorResult.suggestedSellPrice || 0)}
+                      </h3>
+                      <p className="text-xs text-[var(--steel)] mb-2">Similar listings</p>
+                      <ul className="text-xs space-y-1.5">
+                        {estimatorResult.comparables?.map((c, i) => (
+                          <li key={i}>
+                            <a
+                              href={c.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[var(--ink)] underline underline-offset-2 hover:opacity-60"
+                            >
+                              {c.title}
+                            </a>
+                            <span className="text-[var(--steel)] font-mono-num"> — R$ {c.price}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+
+          <BuildAssistant />
+        </aside>
+      </div>
+
+      <AnimatePresence>
+        {activeCategory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-[var(--ink)]/25 backdrop-blur-[2px]"
+            onClick={() => setActiveCategory(null)}
+          >
+            <motion.div
+              initial={{ y: 28, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 28, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[var(--paper)] border border-[var(--line)] w-full max-w-3xl max-h-[88dvh] flex flex-col overflow-hidden"
+            >
+              <div className="p-5 border-b border-[var(--line)] flex items-center justify-between shrink-0">
+                <div>
+                  <p className="font-mono-num text-[10px] tracking-[0.2em] uppercase text-[var(--steel)]">
+                    Catalog
+                  </p>
+                  <h2 className="font-display text-xl font-extrabold tracking-tight text-[var(--ink)] mt-1">
+                    {CATEGORIES.find((c) => c.id === activeCategory)?.label}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setActiveCategory(null)}
+                  type="button"
+                  className="p-2 text-[var(--steel)] hover:text-[var(--ink)] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4 border-b border-[var(--line)] shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--steel-dim)]" />
+                  <input
+                    type="text"
+                    placeholder="Search name or brand…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    autoFocus
+                    className="w-full bg-transparent border border-[var(--line)] pl-10 pr-4 py-3 text-[var(--ink)] text-sm focus:outline-none focus:border-[var(--ink)] placeholder:text-[var(--steel-dim)]"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-0">
+                {parts
+                  .filter((p) => p.category === activeCategory)
+                  .filter(
+                    (p) =>
+                      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      p.brand.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map((part) => (
+                    <PartCard key={part.id} part={part} onSelect={handleSelectPart} />
+                  ))}
+                {parts.filter((p) => p.category === activeCategory).length === 0 && (
+                  <div className="text-center text-[var(--steel)] py-14 text-sm">
+                    No parts — run seed in Admin.
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </PageShell>
   );
 }

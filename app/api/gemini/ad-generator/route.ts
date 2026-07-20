@@ -12,17 +12,16 @@ export async function POST(req: Request) {
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: `
-Crie 3 opções de textos de anúncio (copy) para vender um PC Gamer com as seguintes especificações:
+      contents: `Create 3 ad copy options to sell a gaming PC with these specs:
 ${build}
-Preço de venda: R$ ${price}
+Sell price: R$ ${price}
 
-Variantes desejadas:
-1. "Agressivo" (Focado em FPS, performance em jogos competitivos, gatilhos de urgência)
-2. "Premium" (Focado em estética, qualidade das peças, montagem profissional, garantia, público exigente)
-3. "Direto" (Bullet points, direto ao ponto, apenas especificações e preço, sem muita enrolação)
+Desired variants:
+1. "Aggressive" (FPS-focused, competitive gaming performance, urgency triggers)
+2. "Premium" (aesthetics, part quality, professional assembly, warranty, discerning buyers)
+3. "Direct" (bullet points, straight to the point — specs and price only, no fluff)
 
-Retorne em formato JSON.`,
+Return JSON. Write the ad texts in English.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
