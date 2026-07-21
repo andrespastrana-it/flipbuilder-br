@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { NextResponse } from "next/server";
 
 const ai = new GoogleGenAI({ 
@@ -12,12 +12,18 @@ export async function POST(req: Request) {
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: `Search for the sell price of similar pre-built gaming PCs with the graphics card "${gpuName}" in Brazil.
-Use Google Search to find about 5 real listings (e.g. Mercado Livre, OLX, Facebook, etc).
-Summarize the listings found and estimate a fair sell price for this configuration: ${buildSummary}
+      contents: `Estimate a fair SELL price (in BRL) for a pre-built gaming PC in Brazil built around the graphics card "${gpuName}".
+Use Google Search to find about 5 real, RECENT listings of comparable pre-built PCs (Mercado Livre, OLX, Facebook Marketplace, etc.).
+Rules:
+- Compare against configs with a similar GPU tier and overall spec to: ${buildSummary}
+- Use the à vista (cash) price; ignore installment totals.
+- Discard obvious outliers (broken, parts-only, or scam listings) before estimating.
+- "suggestedSellPrice" should be a realistic, competitive à vista asking price for a quick flip — not a wishful maximum.
       `,
       config: {
         tools: [{ googleSearch: {} }],
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+        temperature: 0.2,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,

@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { NextResponse } from "next/server";
 
 const ai = new GoogleGenAI({ 
@@ -18,8 +18,12 @@ ${JSON.stringify(catalog)}
 COMPATIBILITY RULES (follow strictly):
 1. AM4 processors (e.g. Ryzen 5000) need an AM4 motherboard and DDR4 memory.
 2. AM5 processors (e.g. Ryzen 7000) need an AM5 motherboard and DDR5 memory.
-3. The PSU must support the graphics card.
-4. The case must fit the graphics card.
+3. The PSU wattage must comfortably support the graphics card (leave headroom).
+4. The case must physically fit the graphics card.
+
+Before proposing a build, verify EVERY rule above. Never propose an incompatible combination.
+Only use "id" values that actually exist in the catalog above — never invent an id.
+If the catalog has no compatible option for a required part, explain that in "response" and leave "proposedBuild" as null.
 
 Reply naturally in English, analyzing the user's request and suggesting parts from the catalog.
 If you suggest a full build, fill the "proposedBuild" field in the JSON response. Use correct catalog IDs.
@@ -52,6 +56,8 @@ REQUIRED response format (JSON):
       contents: conversationContext,
       config: {
         systemInstruction,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+        temperature: 0.3,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,

@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { NextResponse } from "next/server";
 
 const ai = new GoogleGenAI({ 
@@ -12,11 +12,18 @@ export async function POST(req: Request) {
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: `Find the lowest current price for this PC part: "${partName}".
+      contents: `Find the lowest CURRENT price for this PC part: "${partName}".
 Search EXCLUSIVELY on these sites: site:kabum.com.br OR site:terabyteshop.com.br OR site:pichau.com.br OR site:mercadolivre.com.br
-Return the 4 cheapest results you find.`,
+Rules:
+- Return the 4 cheapest DISTINCT listings (no duplicate store+product), sorted ascending by price.
+- Prefer in-stock listings and set "inStock" accurately.
+- "url" must be the direct product page, not a search or category page.
+- "price" is the current listed BRL price as a number; use the à vista (cash) price and ignore installment / "em até Nx" totals.
+- Only return listings whose product genuinely matches "${partName}".`,
       config: {
         tools: [{ googleSearch: {} }],
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+        temperature: 0.2,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,

@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { NextResponse } from "next/server";
 
 const ai = new GoogleGenAI({ 
@@ -12,17 +12,20 @@ export async function POST(req: Request) {
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: `Create 3 ad copy options to sell a gaming PC with these specs:
+      contents: `Crie 3 opções de anúncio para vender um PC gamer com estas specs:
 ${build}
-Sell price: R$ ${price}
+Preço de venda: R$ ${price}
 
-Desired variants:
-1. "Aggressive" (FPS-focused, competitive gaming performance, urgency triggers)
-2. "Premium" (aesthetics, part quality, professional assembly, warranty, discerning buyers)
-3. "Direct" (bullet points, straight to the point — specs and price only, no fluff)
+Variantes desejadas:
+1. "Agressivo" (foco em FPS, desempenho competitivo, gatilhos de urgência)
+2. "Premium" (estética, qualidade das peças, montagem profissional, garantia, comprador exigente)
+3. "Direto" (bullet points, direto ao ponto — specs e preço, sem enrolação)
 
-Return JSON. Write the ad texts in English.`,
+Escreva os anúncios em português do Brasil, com tom natural para Mercado Livre / OLX / Facebook Marketplace.
+Não invente specs que não estejam na lista acima. Retorne JSON.`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+        temperature: 0.9,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
